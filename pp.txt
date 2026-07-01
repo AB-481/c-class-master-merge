@@ -1,0 +1,159 @@
+17:`ifdef DUAL_ISSUE
+19:`endif
+29:`ifdef hypervisor
+33:`endif
+45:`ifdef debug
+48:`endif
+50:`ifdef supervisor
+52:`endif
+55:`ifdef DUAL_ISSUE
+58:`else
+61:`endif
+74:`ifdef supervisor
+78:`endif
+79:`ifdef usertraps
+84:`endif
+86:`ifdef etrace_support          
+88:      `endif  
+90:`ifdef rtldump
+97:`ifdef DUAL_ISSUE
+99:`else
+101:`endif
+102:`endif
+103:`ifdef debug
+113:`ifndef core_clkgate
+115:`endif
+125:`endif
+128:`ifdef core_clkgate
+130:`else
+132:`endif
+133:`ifdef supervisor
+136:`endif
+138:`ifdef itim
+140:`endif
+143:`ifdef testmode 
+145:`endif 
+150:  `ifndef DUAL_ISSUE 
+151:  `ifdef testmode 
+153:  `endif 
+154:  `endif );
+156:  `ifdef supervisor
+158:  `endif
+159:    `ifdef hypervisor
+163:  `endif
+165:`ifdef DUAL_ISSUE
+168:`else
+171:`endif
+172:`ifdef pmp
+177:`endif
+181:  `ifdef pmp 
+184:  `endif 
+185:  `ifdef testmode 
+187:  `endif 
+192:  `ifdef pmp 
+195:  `endif 
+196:  `ifdef testmode 
+198:  `endif
+201:`ifdef dcache
+210:    `ifdef DUAL_ISSUE 
+212:  `else 
+214:  `endif
+216:`endif
+249:    `ifdef DUAL_ISSUE 
+251:    `else
+253:  `endif
+271:					`ifndef DUAL_ISSUE ,io     : (fab_resp.rid==1)});
+275:`ifdef icache
+281:`endif
+283:`ifdef dtim
+288:`endif
+289:`ifdef itim
+294:`endif
+314:`ifndef DUAL_ISSUE
+315:  `ifdef RV64
+318:  `endif
+319:`endif
+322:`ifdef DUAL_ISSUE
+327:`else
+328:  `ifdef RV64
+333:  `else
+337:  `endif
+339:`endif	
+345:      `ifdef DUAL_ISSUE 
+347:      `else 
+349:    `endif
+358:      `ifdef DUAL_ISSUE 
+360:      `else ,`axi4_id_width, `USERSPACE
+380:`ifdef DUAL_ISSUE
+383:`else	
+386:`endif
+403:`ifdef dcache
+408:  `ifdef DUAL_ISSUE 
+410:  `else 
+412:  `endif
+418:`ifdef DUAL_ISSUE
+420:`else
+422:`endif
+456:  `ifdef DUAL_ISSUE 
+458:  `else 
+460:  `endif
+465:      `ifdef DUAL_ISSUE
+467:      `else 
+469:      `endif
+486:`ifdef DUAL_ISSUE 
+488:`else 
+490:`endif );
+517:      `ifdef DUAL_ISSUE 
+519:      `else 
+521:      `endif
+527:`ifdef DUAL_ISSUE
+531:`else
+535:`endif
+543:`ifdef DUAL_ISSUE
+546:`else
+549:`endif
+552:`ifdef DUAL_ISSUE
+558:`else	
+565:`endif
+567:`ifdef DUAL_ISSUE
+569:`else
+571:`endif
+584:	`ifdef DUAL_ISSUE
+589:	`else
+591:	`endif
+595:	`ifdef DUAL_ISSUE
+597:	`else
+599:	`endif
+607:`ifdef DUAL_ISSUE
+610:`else
+614:`endif
+618:`ifdef DUAL_ISSUE
+620:`else
+630:`endif
+634:`ifdef itim 
+649:`endif
+650:`endif
+655:`ifdef supervisor
+663:  `ifndef hypervisor
+665:  `endif
+666:  `ifdef hypervisor
+675:  `endif
+715:`endif
+717:`ifdef perfmonitors
+718:  `ifdef icache
+720:  `endif
+721:  `ifdef dcache
+723:  `endif
+724:  `ifdef supervisor
+727:  `endif
+728:`endif   
+747:`ifdef supervisor
+749:`endif
+750:`ifdef usertraps
+752:`endif
+756:   `ifdef etrace_support          
+758:      `endif
+760:`ifdef rtldump
+763:`endif
+764:`ifdef debug
+771:`endif

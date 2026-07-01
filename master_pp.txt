@@ -1,0 +1,72 @@
+27:`ifdef hypervisor
+31:`endif
+43:`ifdef debug
+46:`endif
+48:`ifdef supervisor
+50:`endif
+67:`ifdef supervisor
+71:`endif
+72:`ifdef usertraps
+77:`endif
+79:`ifdef etrace_support          
+81:      `endif  
+83:`ifdef rtldump
+91:`endif
+92:`ifdef simulate
+94:`endif
+95:`ifdef debug
+105:`ifndef core_clkgate
+107:`endif
+117:`endif
+121:`ifdef supervisor
+124:`endif
+126:`ifdef itim
+128:`endif
+135:  `ifdef supervisor
+137:  `endif
+138:    `ifdef hypervisor
+142:  `endif
+146:`ifdef pmp
+151:`endif
+159:`ifdef simulate
+161:`endif
+163:`ifdef dcache
+172:`endif
+198:`ifdef simulate
+202:`endif
+230:`ifdef icache
+236:`endif
+238:`ifdef dtim
+243:`endif
+244:`ifdef itim
+249:`endif
+323:`ifdef dcache
+472:`ifdef itim 
+487:`endif
+488:`endif
+493:`ifdef supervisor
+501:  `ifndef hypervisor
+503:  `endif
+504:  `ifdef hypervisor
+513:  `endif
+553:`endif
+555:`ifdef perfmonitors
+556:  `ifdef icache
+558:  `endif
+559:  `ifdef dcache
+561:  `endif
+562:  `ifdef supervisor
+565:  `endif
+566:`endif   
+585:`ifdef supervisor
+587:`endif
+588:`ifdef usertraps
+590:`endif
+594:   `ifdef etrace_support          
+596:      `endif
+598:`ifdef rtldump
+601:`endif
+602:`ifdef simulate
+604:`endif
+605:`ifdef debug
+612:`endif

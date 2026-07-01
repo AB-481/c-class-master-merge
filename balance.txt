@@ -1,0 +1,776 @@
+   1   0 //See LICENSE.iitm for license details
+   2   0 /*
+   3   0 
+   4   0 Author : IIT Madras
+   5   0 Details:
+   6   0 
+   7   0 --------------------------------------------------------------------------------------------------
+   8   0 */
+   9   0 package ccore;
+  10   0 
+  11   0 //=================== Interface and module for a ccore - master on the AXI4 fabric ============= //
+  12   0 // project related imports
+  13   0 import Semi_FIFOF:: *;
+  14   0 import AXI4_Types:: *;
+  15   0 import AXI4_Fabric:: *;
+  16   0 //import riscv:: * ;
+  17   1 `ifdef DUAL_ISSUE
+  18   1 import Vector :: *;
+  19   0 `endif
+  20   0 import riscv :: *;
+  21   0 import ccore_types:: * ;
+  22   0 import FIFOF::*;
+  23   0 import dcache_types :: *;
+  24   0 import icache_types :: * ;
+  25   0 import Assert ::*;
+  26   0 import imem::*;
+  27   0 import dmem::*;
+  28   0 import pipe_ifcs :: * ;
+  29   1 `ifdef hypervisor
+  30   1   import ptwalk_hypervisor :: * ;
+  31   1 `elsif supervisor
+  32   1   import ptwalk_merged::*;
+  33   0 `endif
+  34   0 `include "ccore_params.defines"
+  35   0 `include "Logger.bsv"
+  36   0 
+  37   0 `define Mem_master_num 0
+  38   0 
+  39   0 // package imports
+  40   0 import Connectable 				:: *;
+  41   0 import GetPut:: *;
+  42   0 import BUtils::*;
+  43   0 import csrbox :: * ;
+  44   0 
+  45   1 `ifdef debug
+  46   1 import debug_types  :: * ;
+  47   1 import csr_types    :: * ;
+  48   0 `endif
+  49   0 
+  50   1 `ifdef supervisor
+  51   1 typedef enum {None, IWalk, DWalk} PTWState deriving(Bits, Eq, FShow);
+  52   0 `endif
+  53   0 
+  54   0 interface Ifc_ccore_axi4;
+  55   1 `ifdef DUAL_ISSUE
+  56   1 interface AXI4_Master_IFC#(`paddr, `elen, USERSPACE) master_d;
+  57   1 interface AXI4_Master_IFC#(`paddr, `elen, USERSPACE) master_i;
+  58   1 `else
+  59   1 	interface AXI4_Master_IFC#(`paddr, `axi4_id_width ,`buswidth, `USERSPACE) master_d;
+  60   1 	interface AXI4_Master_IFC#(`paddr, `axi4_id_width ,`buswidth, `USERSPACE) master_i;
+  61   0 `endif
+  62   0     interface Put#(Bit#(1)) sb_clint_msip;
+  63   0 
+  64   0 	/*doc:method: This method should receive the machine timer interrupt from the CLINT module*/
+  65   0   interface Put#(Bit#(1)) sb_clint_mtip;
+  66   0 
+  67   0 	/*doc:method: This method should receive the machine timer value from the CLINT module. This will
+  68   0 	* be used for the pseduo op rdtime instruction in the user mode*/
+  69   0   interface Put#(Bit#(64)) sb_clint_mtime;
+  70   0 
+  71   0   /*doc:method: This method should receive the machine external interrupt from the PLIC module*/
+  72   0 	method Action sb_plic_meip(Bit#(1) ex_i);
+  73   0 
+  74   1 `ifdef supervisor
+  75   1   /*doc:method: When supervisor is enabled, this method will receive the supervisor external
+  76   1    * interrupt from the PLIC. Note this is a different context from the machine external interrupt*/
+  77   1 	method Action sb_plic_seip(Bit#(1) ex_i);
+  78   0 `endif
+  79   1 `ifdef usertraps
+  80   1   /*doc:method: When user traps (N-extesion) is enabled, this method will receive the user external
+  81   1    * interrupt from the PLIC. Note this is a different context from the machine,supervisor 
+  82   1    * external interrupt*/
+  83   1 	method Action sb_plic_ueip(Bit#(1) ex_i);
+  84   0 `endif
+  85   0 
+  86   1 `ifdef etrace_support          
+  87   1       interface Ifc_s5_etrace etrace_ingress_port;
+  88   0       `endif  
+  89   0 
+  90   1 `ifdef rtldump
+  91   1   /*doc:sbifc: This interface is available only for simulation when intruction trace dump has been 
+  92   1   enabled. This method is used to read the value of the csrs in the next cycle after csr-ops are
+  93   1   done. This allows the TB to dump the correct value that is written to the csr.*/
+  94   1   interface Sbread sbread;
+  95   1   /*doc:method: this method carries the trace dump information of the instruction that was recently
+  96   1    * committed*/
+  97   2 `ifdef DUAL_ISSUE
+  98   2   method Vector#(`num_issue, Maybe#(CommitLogPacket)) commitlog;
+  99   2 `else
+ 100   2   method Maybe#(CommitLogPacket) commitlog;
+ 101   1 `endif
+ 102   0 `endif
+ 103   1 `ifdef debug
+ 104   1   /*doc:method: This method is used to capture the interrupt from the debugger in case of resume or
+ 105   1    * halt indication*/
+ 106   1   method Action ma_debug_interrupt(Bit#(1) _int);
+ 107   1   /*doc:method: This method indicates if the core has been reset successfully*/
+ 108   1   method Bit#(1) mv_core_is_reset;
+ 109   1 
+ 110   1   /*doc:method: This method indicates to the debugger is the core is available for debugging*/
+ 111   1   method Bit#(1) mv_core_debugenable;
+ 112   1 
+ 113   2 `ifndef core_clkgate
+ 114   2   (*always_enabled*)
+ 115   1 `endif
+ 116   1   /*doc:method: This action method indicates the core that a debugger is connected and available for
+ 117   1    * carrying our debug operations*/
+ 118   1   method Action ma_debugger_available (Bit#(1) avail);
+ 119   1   /*doc:method: This method holds the bits from the dcsr register which indicate that the timer in
+ 120   1    * CLINT should stop incrementing when in debug mode*/
+ 121   1   method Bit#(1) mv_stop_timer;
+ 122   1   /*doc:method: This method holds the bits from the dcsr register which indicate that the
+ 123   1    * mhpmcounters in the csrs should stop incrementing when in debug mode*/
+ 124   1   method Bit#(1) mv_stop_count;
+ 125   0 `endif
+ 126   0 endinterface : Ifc_ccore_axi4
+ 127   0 
+ 128   1 `ifdef core_clkgate
+ 129   1   (*synthesize,gate_all_clocks*)
+ 130   1 `else
+ 131   1   (*synthesize*)
+ 132   0 `endif
+ 133   1 `ifdef supervisor
+ 134   1 (*preempts="rl_dtlb_req_to_ptwalk, rl_itlb_req_to_ptwalk"*)
+ 135   1   (*preempts="core_req_mkConnectionGetPut, ptwalk_req_mkConnectionGetPut"*)
+ 136   0 `endif
+ 137   0 
+ 138   1 `ifdef itim
+ 139   1   (*conflict_free="handle_itim_write_resp, handle_nc_write_resp"*)
+ 140   0 `endif
+ 141   0 (*mutually_exclusive ="rl_handle_io_read_response, rl_handle_io_write_resp"*)
+ 142   0 module mkccore_axi4#(Bit#(`vaddr) resetpc, parameter Bit#(`xlen) hartid 
+ 143   1 `ifdef testmode 
+ 144   1 ,Bool test_mode 
+ 145   0 `endif 
+ 146   0 )(Ifc_ccore_axi4);
+ 147   0   String core = "";
+ 148   0   /*doc:mod: instatiate the riscv pipeline */
+ 149   0   Ifc_riscv riscv <- mkriscv(resetpc, hartid 
+ 150   1   `ifndef DUAL_ISSUE 
+ 151   2   `ifdef testmode 
+ 152   2   ,test_mode 
+ 153   1   `endif 
+ 154   0   `endif 
+ 155   0   );
+ 156   0 
+ 157   1   `ifdef supervisor
+ 158   1     Reg#(PTWState) rg_ptw_state <- mkReg(None);
+ 159   0   `endif
+ 160   1     `ifdef hypervisor
+ 161   1     Ifc_ptwalk ptwalk <- mkptwalk;
+ 162   1   `elsif supervisor
+ 163   1     Ifc_ptwalk#(`asidwidth) ptwalk <- mkptwalk;
+ 164   0   `endif
+ 165   0 
+ 166   1 `ifdef DUAL_ISSUE
+ 167   1 AXI4_Master_Xactor_IFC #(`paddr, `elen, USERSPACE) fetch_xactor <- mkAXI4_Master_Xactor;
+ 168   1 AXI4_Master_Xactor_IFC #(`paddr, `elen, USERSPACE) memory_xactor <- mkAXI4_Master_Xactor;
+ 169   1 `else
+ 170   1 	AXI4_Master_Xactor_IFC #(`paddr, `axi4_id_width ,`buswidth, `USERSPACE) fetch_xactor <- mkAXI4_Master_Xactor;
+ 171   1 	AXI4_Master_Xactor_IFC #(`paddr, `axi4_id_width ,`buswidth, `USERSPACE) memory_xactor <- mkAXI4_Master_Xactor;
+ 172   0 `endif
+ 173   1 `ifdef pmp
+ 174   1   /*doc:var: When pmp is enabled we capture the curernt pmp configurations and addresses that will
+ 175   1   * be required by the TLBs*/
+ 176   1   let lv_pmp_cfg = riscv.csrs.mv_pmp_cfg;
+ 177   1   let lv_pmp_adr = riscv.csrs.mv_pmp_addr;
+ 178   0 `endif
+ 179   0 
+ 180   0   /*doc:mod: instantiate the instruction memory subsystem*/
+ 181   0 	Ifc_imem imem <- mkimem(truncate(hartid) 
+ 182   1   `ifdef pmp 
+ 183   1   ,lv_pmp_cfg
+ 184   1   , lv_pmp_adr 
+ 185   0   `endif 
+ 186   1   `ifdef testmode 
+ 187   1   ,test_mode 
+ 188   0   `endif 
+ 189   0   );
+ 190   0 
+ 191   0   /*doc:mod: instantiate the data memory subsystem*/
+ 192   0 	Ifc_dmem dmem <- mkdmem(truncate(hartid) 
+ 193   1   `ifdef pmp 
+ 194   1   ,lv_pmp_cfg
+ 195   1   , lv_pmp_adr 
+ 196   0   `endif 
+ 197   1   `ifdef testmode 
+ 198   1   ,test_mode 
+ 199   0   `endif
+ 200   0   );
+ 201   0 
+ 202   1 `ifdef dcache
+ 203   1   /*doc:reg: This register is used to keep track of the beats/bursts occurring during the write
+ 204   1   * operation of a data line to memory. A new line-write or an io-write operation can be initiated
+ 205   1   * only when rg_burst_count == 0, else the requests are stalled. */
+ 206   1   Reg#(Bit#(8)) rg_burst_count <- mkReg(0);
+ 207   1 
+ 208   1   /*doc:reg: While performing burst writes during line eviction, this register indicates the amount
+ 209   1    * the line should be shifted to send the next beat of data on the bus*/
+ 210   1   Reg#(Bit#(TLog#(TMul#(TMul#(`dwords, 8), `dblocks)))) rg_shift_amount <- mkReg(
+ 211   2     `ifdef DUAL_ISSUE 
+ 212   2   `dwords * 8 
+ 213   2   `else 
+ 214   2   `buswidth 
+ 215   1   `endif
+ 216   1   );
+ 217   0 `endif
+ 218   0   /*doc: capture the current privilege mode under which the current transaction is being carried
+ 219   0   * out. TODO: This should ideally come form the caches themselves. Capturing here can have issues.
+ 220   0   * For example during an eviction, if the prv changes in the write-back stage then stores of the same
+ 221   0   * line may occur in different privilege modes*/
+ 222   0   let curr_priv = riscv.csrs.mv_curr_priv;
+ 223   0 
+ 224   0 	/*doc:connect: Connect the instruction request from the core to the instruction memory subsystem*/
+ 225   0 	mkConnection(imem.put_core_req , riscv.s0_icache.to_icache);
+ 226   0 
+ 227   0   /*doc:connect: Connect the instruction memoty subsystem's response to the pipeline's stage-1 which
+ 228   0    * will accept it and process*/
+ 229   0 	mkConnection(imem.get_core_resp, riscv.s1_icache.inst_response); // imem integration
+ 230   0 
+ 231   0   /*doc:connect: Send the signal from the data memory subsystem indicating that it is available to
+ 232   0    * receive new instructions from the stage3. If unavailable, stage3 should stall on a possible
+ 233   0    * memory operation.*/
+ 234   0 	mkConnection(dmem.mv_dmem_available, riscv.s3_cache.ma_cache_is_available);
+ 235   0 
+ 236   0   /*doc:connect: Connect the load/store request happening in the stage3 of the pipeline to the
+ 237   0    * request port of the data memory subsystem*/
+ 238   0   let core_req <- mkConnection(dmem.receive_core_req, riscv.s3_cache.mv_memory_request);
+ 239   0 
+ 240   0   /*doc:connect: Connect the data memory subsystem's response to stage4 of the pipeline*/
+ 241   0 	let core_resp <- mkConnection(dmem.send_core_cache_resp, riscv.s4_cache.memory_response); // dmem integration
+ 242   0 
+ 243   0   /*doc:rule: This rule sends out requests from the I-cache to the fabric. This rule will only fire
+ 244   0   * when there has been a line-miss in the instructino cache or the request is an io operation. This
+ 245   0   * rule also will not fire if the fetch-xactor fifo is full - which can happen due to contention in
+ 246   0   * the fabric*/
+ 247   0   rule rl_handle_imem_line_request;
+ 248   0 		let request <- imem.get_read_mem_req.get;
+ 249   0 		AXI4_Rd_Addr#(`paddr 
+ 250   1     `ifdef DUAL_ISSUE 
+ 251   1     , 0 
+ 252   1     `else
+ 253   1     , `axi4_id_width, `USERSPACE
+ 254   0   `endif
+ 255   0     ) imem_request = AXI4_Rd_Addr {araddr : truncate(request.address),
+ 256   0       aruser: ?, arlen : request.burst_len, arsize : request.burst_size, arburst : 'b10,
+ 257   0       arid : zeroExtend(pack(request.io)), arprot:{1'b1, 1'b0, curr_priv[1]} }; // arburst : 00 - FIXED 01 - INCR 10 - WRAP
+ 258   0 	  fetch_xactor.i_rd_addr.enq(imem_request);
+ 259   0 		`logLevel( core, 1, $format("[%2d]CORE : IMEM Line Requesting ",hartid, fshow(imem_request)))
+ 260   0   endrule:rl_handle_imem_line_request
+ 261   0 
+ 262   0   /*doc:rule: This rule captures the response from the fetch transactor of the fabric and routes
+ 263   0    * the response back to the instruction memory subsystem. This rule will fire only when the
+ 264   0    * fetch-xactor has a response available. The instruction memory is implicitly assumed to be always
+ 265   0    * available to pick the responses owing to its blocking nature*/
+ 266   0 	rule rl_handle_imem_line_resp;
+ 267   0 	  let fab_resp <- pop_o (fetch_xactor.o_rd_data);
+ 268   0 		Bool bus_error = !(fab_resp.rresp == AXI4_OKAY);
+ 269   0     imem.put_read_mem_resp.put(ICache_mem_readresp{data   : truncate(fab_resp.rdata),
+ 270   0                                                last   : fab_resp.rlast,
+ 271   0                                                err    : bus_error
+ 272   1 					`ifndef DUAL_ISSUE ,io     : (fab_resp.rid==1)});
+ 273   1 		`logLevel( core, 1, $format("[%2d]CORE : IMEM Line Response ",hartid, fshow(fab_resp)))
+ 274   1 	endrule:rl_handle_imem_line_resp
+ 275   1 
+ 276   2 `ifdef icache
+ 277   2   /*doc:rule: This rule is used connect the cache enable signal for the instruction memory
+ 278   2    * subsystem*/
+ 279   2   rule rl_imem_enable;
+ 280   2 	  imem.ma_cache_enable(unpack(riscv.csrs.mv_cacheenable[0]));
+ 281   2   endrule: rl_imem_enable
+ 282   1 `endif
+ 283   1 
+ 284   2 `ifdef dtim
+ 285   2   /*doc:rule: */
+ 286   2   rule rl_connect_dtim_memorymap_csrs;
+ 287   2     dmem.ma_dtim_memory_map(truncate(riscv.mv_csr_dtim_base), truncate(riscv.mv_csr_dtim_bound));
+ 288   2   endrule
+ 289   1 `endif
+ 290   2 `ifdef itim
+ 291   2   /*doc:rule: */
+ 292   2   rule rl_connect_itim_memorymap_csrs;
+ 293   2     imem.ma_itim_memory_map(truncate(riscv.mv_csr_itim_base), truncate(riscv.mv_csr_itim_bound));
+ 294   2   endrule
+ 295   1 `endif
+ 296   1 
+ 297   1 	/*doc:rule: This rule will initiate an IO read or write as indicated by the WB stage of the
+ 298   1 	* pipeline. If a burst write is on-going then this rule is stalled. Since AXI4 support narrow
+ 299   1   * transfers (transfers whose size is lesser than the size of the bus), for write operations 
+ 300   1   * we make sure to duplicate
+ 301   1   * the data accordingly so that respective bytes of the lane contain the correct data. This is easier
+ 302   1   * than to shift the data.*/
+ 303   1   rule rl_initiate_io `ifdef dcache (rg_burst_count == 0) `endif ;
+ 304   1 	  // receive the request from the data memory subsystem
+ 305   1 	  let req <- dmem.send_mem_io_req.get;
+ 306   1     `logLevel( core, 0, $format("CORE: Received io op: ",fshow(req)))
+ 307   1 
+ 308   1     // resize the data and duplicate the bytes based on the size of the transaction
+ 309   1     if(req.size[1:0]== 0)
+ 310   1       req.data = duplicate(req.data[7 : 0]);
+ 311   1     else if(req.size[1:0] == 1)
+ 312   1       req.data = duplicate(req.data[15 : 0]);
+ 313   1     else if(req.size[1:0] == 2)
+ 314   1       req.data = duplicate(req.data[31 : 0]);
+ 315   2 `ifndef DUAL_ISSUE
+ 316   3   `ifdef RV64
+ 317   3      else 
+ 318   3        req.data = duplicate(req.data[63 : 0]);
+ 319   2   `endif
+ 320   1 `endif
+ 321   1     // build the write-strobe based on the size of the request.
+ 322   1 
+ 323   2 `ifdef DUAL_ISSUE
+ 324   2 Bit#(TDiv#(`elen, 8)) write_strobe = req.size[1:0] == 0?'b1 :
+ 325   2                                         req.size[1:0] == 1?'b11 :
+ 326   2                                         req.size[1:0] == 2?'hf : '1;
+ 327   2     Bit#(TAdd#(1, TDiv#(`elen, 32))) byte_offset = truncate(req.address);
+ 328   2 `else
+ 329   3   `ifdef RV64
+ 330   3     Bit#(TDiv#(`buswidth, 8)) write_strobe = req.size[1:0] == 0?'b1 :
+ 331   3                                         req.size[1:0] == 1?'b11 :
+ 332   3                                         req.size[1:0] == 2?'hf : 
+ 333   3                                         req.size[1:0] == 3?'hff :   '1;
+ 334   3   `else
+ 335   3     Bit#(TDiv#(`buswidth, 8)) write_strobe = req.size[1:0] == 0?'b1 :
+ 336   3                                         req.size[1:0] == 1?'b11 :
+ 337   3                                         req.size[1:0] == 2?'hf :    '1;
+ 338   2   `endif
+ 339   2     Bit#(TLog#(TDiv#(`buswidth, 8))) byte_offset = truncate(req.address);
+ 340   1 `endif	
+ 341   1     write_strobe = write_strobe<<byte_offset;
+ 342   1 
+ 343   1     // if read operation send transaction on the i_rd_addr channel
+ 344   1 	  if (!req.read_write) begin
+ 345   1 		  AXI4_Rd_Addr#(`paddr 
+ 346   2       `ifdef DUAL_ISSUE 
+ 347   2       ,0 
+ 348   2       `else 
+ 349   2       ,`axi4_id_width, `USERSPACE
+ 350   1     `endif
+ 351   1       ) dmem_request = AXI4_Rd_Addr {araddr : truncate(req.address), aruser: ?,
+ 352   1         arlen : 0, arsize : zeroExtend(req.size[1:0]), arburst : 'b00, // arburst : 00 - FIXED 01 - INCR 10 - WRAP
+ 353   1         arid : 1 ,arprot:{1'b0, 1'b0, curr_priv[1]} }; 
+ 354   1       memory_xactor.i_rd_addr.enq(dmem_request);
+ 355   1 	  end
+ 356   1 	  // if write operation send transaction on the i_wr_addr and i_wr_data channels
+ 357   1 	  else begin
+ 358   1 	    AXI4_Wr_Addr#(`paddr 
+ 359   2       `ifdef DUAL_ISSUE 
+ 360   2       ,0 
+ 361   2       `else ,`axi4_id_width, `USERSPACE
+ 362   2       ) aw = AXI4_Wr_Addr {awaddr : truncate(req.address), awuser : 0,
+ 363   2         awlen : 0, awsize : zeroExtend(req.size[1 : 0]), awburst : 'b0,
+ 364   2         awid : 1, awprot:{1'b0, 1'b0, curr_priv[1]} }; // arburst : 00 - FIXED 01 - INCR 10 - WRAP
+ 365   2 
+ 366   2       let w  = AXI4_Wr_Data {wdata : truncate(req.data), wstrb : write_strobe,
+ 367   2                              wlast : True, 
+ 368   2                              wid : 1};
+ 369   2 	    memory_xactor.i_wr_addr.enq(aw);
+ 370   2 	    memory_xactor.i_wr_data.enq(w);
+ 371   2 	  end
+ 372   2 	endrule:rl_initiate_io
+ 373   2 
+ 374   2    /*doc:rule: This rule will receive the response generated for a previous data memory subsystem IO
+ 375   2   * read transaction. Because of the in-order nature of the core and that all IO transactions in the
+ 376   2   * WB stage can only be initiated when the previous one is over, we do not need to handle the
+ 377   2   * scenario where the responses can be out of order.*/
+ 378   2   rule rl_handle_io_read_response(memory_xactor.o_rd_data.first.rid == 1);
+ 379   2     let response <- pop_o(memory_xactor.o_rd_data);
+ 380   2   	let bus_error = !(response.rresp == AXI4_OKAY);
+ 381   3 `ifdef DUAL_ISSUE
+ 382   3 dmem.receive_mem_io_resp.put(DCache_io_response{data:response.rdata, 
+ 383   3                                               error:bus_error});
+ 384   3 `else	
+ 385   3     dmem.receive_mem_io_resp.put(DCache_io_response{data:truncate(response.rdata), 
+ 386   3                                               error:bus_error});
+ 387   2 `endif
+ 388   2     `logLevel( core, 1, $format("[%2d]CORE : IO Read Response ",hartid, fshow(response)))
+ 389   2   endrule:rl_handle_io_read_response
+ 390   2 
+ 391   2 
+ 392   2   /*doc:rule: This rule will receive the response generated for a previous data memory subsystem IO
+ 393   2   * write transaction. Because of the in-order nature of the core and that all IO transactions in the
+ 394   2   * WB stage can only be initiated when the previous one is over, we do not need to handle the
+ 395   2   * scenario where the responses can be out of order.*/
+ 396   2   rule rl_handle_io_write_resp (memory_xactor.o_wr_resp.first.bid == 1);
+ 397   2     let response <- pop_o(memory_xactor.o_wr_resp);
+ 398   2   	let bus_error = !(response.bresp == AXI4_OKAY);
+ 399   2     dmem.receive_mem_io_resp.put(DCache_io_response{data: ?, 
+ 400   2                                               error:bus_error});
+ 401   2     `logLevel( core, 1, $format("[%2d]CORE : IO Write Response ",hartid, fshow(response)))
+ 402   2   endrule:rl_handle_io_write_resp
+ 403   2 
+ 404   3 `ifdef dcache
+ 405   3 
+ 406   3   /*doc:reg: This register when Valid, indicaets that there is pending read line operation which got
+ 407   3    * delayed because of a contentious write happening on the same line address*/
+ 408   3   Reg#(Maybe#(AXI4_Rd_Addr#(`paddr 
+ 409   4   `ifdef DUAL_ISSUE 
+ 410   4   ,0 
+ 411   4   `else 
+ 412   4   ,`axi4_id_width, `USERSPACE
+ 413   3   `endif
+ 414   3   ))) rg_read_line_req <- mkReg(tagged Invalid);
+ 415   3 
+ 416   3   /*doc:reg: This register when Valid, indicates the address to which a line a request is in
+ 417   3    * progress. This is used to delay a read operation on the same line initiated by the cache*/
+ 418   3 
+ 419   4 `ifdef DUAL_ISSUE
+ 420   4 Reg#(Maybe#(Bit#(`paddr))) wr_write_req <- mkReg(tagged Invalid);
+ 421   4 `else
+ 422   4   Reg#(Maybe#(Bit#(`paddr))) rg_write_req <- mkReg(tagged Invalid);
+ 423   3 `endif
+ 424   3   
+ 425   3   /*doc:rule: This rule is used connect the cache enable signal for the data memory
+ 426   3    * subsystem*/
+ 427   3   rule rl_map_dmem_enable;
+ 428   3 	  dmem.ma_cache_enable(unpack(riscv.csrs.mv_cacheenable[1]));
+ 429   3   endrule:rl_map_dmem_enable
+ 430   3 
+ 431   3   /*doc:connect: This connects the store commit routine from the WB stage of the pipeline to the
+ 432   3    * commit store method of the data memory subsystem*/
+ 433   3   mkConnection(dmem.ma_commit_store, riscv.s5_cache.mv_initiate_store);
+ 434   3 
+ 435   3   /*doc:connect: This connects the IO commit routine from the WB stage of the pipeline to the
+ 436   3    * commit io method of the data memory subsystem*/
+ 437   3   mkConnection(dmem.ma_commit_io, riscv.s5_cache.mv_initiate_ioop);
+ 438   3 
+ 439   3   /*doc:connect: This connects the io response from the data memory subsystem to the WB stage of the
+ 440   3    * pipeline */
+ 441   3   mkConnection(dmem.send_core_io_resp, riscv.s5_cache.ma_io_response);
+ 442   3 
+ 443   3   /*doc:rule: Currently it is possible that the data cache can generate a write - request followed by a
+ 444   3   read - request, but the fabric (due to contention) latches the read first to the slave followed
+ 445   3   by the write - req. This could lead to wrong behavior. To avoid this it is necessary to ensure
+ 446   3   that if a write - request has been initiated no read - requests should be latched unless the
+ 447   3   write - response has arrived.
+ 448   3   The constraint is fulfilled using the register (wr in dual issue) rg_write_req which holds the current address of
+ 449   3   the line being written to the fabric on a eviction. When such a conflict is detected we store the
+ 450   3   popped request from the data memory subsystem into the rg_read_line_req register so that it can be
+ 451   3   handled once the conflict is done.
+ 452   3   */
+ 453   3   rule rl_handle_dmem_line_read_request(rg_read_line_req matches tagged Invalid );
+ 454   3     Bool perform_req = True;
+ 455   3   	let req <- dmem.send_mem_rd_req.get;
+ 456   3 	AXI4_Rd_Addr#(`paddr 
+ 457   4   `ifdef DUAL_ISSUE 
+ 458   4   ,0 
+ 459   4   `else 
+ 460   4   ,`axi4_id_width, `USERSPACE
+ 461   3   `endif
+ 462   3   ) dmem_request = AXI4_Rd_Addr {araddr : truncate(req.address), aruser: ?,
+ 463   3       arlen : req.burst_len, arsize : req.burst_size, arburst : 'b10, // arburst : 00 - FIXED 01 - INCR 10 - WRAP
+ 464   3       arid : 0 ,arprot:{1'b0, 1'b0, curr_priv[1]} }; 
+ 465   3     if(
+ 466   4       `ifdef DUAL_ISSUE
+ 467   4       wr_write_req matches tagged Valid .waddr 
+ 468   4       `else 
+ 469   4       rg_write_req matches tagged Valid .waddr 
+ 470   3       `endif
+ 471   3       ) begin
+ 472   3       if((waddr>>(`dwords + `dblocks )) == (req.address>>(`dwords + `dblocks ) ))begin
+ 473   3         perform_req = False;
+ 474   3         rg_read_line_req <= tagged Valid dmem_request;
+ 475   3         `logLevel( core, 1, $format("[%2d]CORE: Delaying Request: ",hartid,fshow(req)))
+ 476   3       end
+ 477   3     end
+ 478   3     if(perform_req)  begin
+ 479   3  	    memory_xactor.i_rd_addr.enq(dmem_request);
+ 480   3       `logLevel( core, 1, $format("[%2d]CORE : DMEM Line Requesting ",hartid, fshow(dmem_request)))
+ 481   3     end
+ 482   3 	endrule:rl_handle_dmem_line_read_request
+ 483   3 
+ 484   3   /*doc:rule: This rule will fire when a pending read operation is present due to a RAW conflict on
+ 485   3    * the line address*/
+ 486   3   rule rl_handle_delayed_read(rg_read_line_req matches tagged Valid .r &&&
+ 487   4 `ifdef DUAL_ISSUE 
+ 488   4 wr_write_req matches tagged Invalid 
+ 489   4 `else 
+ 490   4 rg_write_req matches tagged Invalid 
+ 491   3 `endif 
+ 492   3 );
+ 493   3 	  memory_xactor.i_rd_addr.enq(r);
+ 494   3     `logLevel( core, 1, $format("[%2d]CORE : DMEM Delayed Line Requesting ",hartid, fshow(r)))
+ 495   3     rg_read_line_req <= tagged Invalid;
+ 496   3   endrule:rl_handle_delayed_read
+ 497   3 
+ 498   3 	rule rl_handle_dmem_line_resp(memory_xactor.o_rd_data.first.rid == 0);
+ 499   3     let fab_resp <- pop_o (memory_xactor.o_rd_data);
+ 500   3 		let lv_data= fab_resp.rdata;
+ 501   3   	Bool bus_error = !(fab_resp.rresp == AXI4_OKAY);
+ 502   3     dmem.receive_mem_rd_resp.put(DCache_mem_readresp{data:truncate(lv_data),
+ 503   3                                                last:fab_resp.rlast,
+ 504   3                                                err :bus_error});
+ 505   3     `logLevel( core, 1, $format("[%2d]CORE : DMEM Line Response ",hartid, fshow(fab_resp)))
+ 506   3   endrule:rl_handle_dmem_line_resp
+ 507   3 
+ 508   3   /*doc:rule: This rule is fired when the data memory subsytem is requesting to write an entire line
+ 509   3    * back to memory. This rule will only fire if both the write address channel and the write data
+ 510   3   * channel are capable of taking in new transactions. In this rule we will enqueue the first beat
+ 511   3   * of line. Once sent, the rg_burst_count count is incremented preventing this rule from firing in
+ 512   3   * the susequent cycles untill all the beats of the line has been delivered.*/
+ 513   3   rule rl_handle_dmem_write_request (rg_burst_count == 0);
+ 514   3     // pop the request from the data cache.
+ 515   3     let req = dmem.send_mem_wr_req;
+ 516   3 
+ 517   3     // write strobe will always be all-ones.
+ 518   3 	  Bit#(TDiv#(
+ 519   4       `ifdef DUAL_ISSUE 
+ 520   4       `elen 
+ 521   4       `else 
+ 522   4       `buswidth 
+ 523   3       `endif
+ 524   3       , 8)) write_strobe = '1;
+ 525   3 
+ 526   3   	// increment burst count to indicate one beat has been sent.
+ 527   3       rg_burst_count <= rg_burst_count + 1;
+ 528   3 
+ 529   4 `ifdef DUAL_ISSUE
+ 530   4 AXI4_Wr_Addr#(`paddr, 0) aw = AXI4_Wr_Addr {awaddr : truncate(req.address), awuser : 0,
+ 531   4       awlen : req.burst_len, awsize : zeroExtend(req.burst_size[1 : 0]), awburst : 'b01,
+ 532   4       awid : 0, awprot:{1'b0, 1'b0, curr_priv[1]} }; // arburst : 00 - FIXED 01 - INCR 10 - WRAP
+ 533   4 `else
+ 534   4       AXI4_Wr_Addr#(`paddr,`axi4_id_width, `USERSPACE) aw = AXI4_Wr_Addr {awaddr : truncate(req.address), awuser : 0,
+ 535   4       awlen : req.burst_len, awsize : zeroExtend(req.burst_size), awburst : 'b01,
+ 536   4       awid : 0, awprot:{1'b0, 1'b0, curr_priv[1]} }; // arburst : 00 - FIXED 01 - INCR 10 - WRAP
+ 537   3 `endif
+ 538   3 
+ 539   3 	  let w  = AXI4_Wr_Data {wdata : truncate(req.data), wstrb : write_strobe,
+ 540   3                            wlast : req.burst_len == 0, 
+ 541   3                            wid : 0};
+ 542   3     memory_xactor.i_wr_addr.enq(aw);
+ 543   3 	  memory_xactor.i_wr_data.enq(w);
+ 544   3     `logLevel( core, 1, $format("[%2d]CORE : DMEM Line Write Addr : Request ",hartid, fshow(aw)))
+ 545   4 `ifdef DUAL_ISSUE
+ 546   4 if(req.burst_len != 0 )
+ 547   4       wr_write_req <= tagged Valid req.address;
+ 548   4 `else
+ 549   4     // burst length is > 0 whenever line_size > bus_data_width
+ 550   4     rg_write_req <= tagged Valid req.address;
+ 551   3 `endif
+ 552   3   endrule:rl_handle_dmem_write_request
+ 553   3 
+ 554   4 `ifdef DUAL_ISSUE
+ 555   4 /*doc:rule: This rule sends the burst beats of the line write operation. On each iteration the
+ 556   4   * line is read from the eviction fifo of the data memory subystem and shifted by an appropriate
+ 557   4   * amount indicating the beat number. On the last beat, the eviction fifo is dequence and the burst
+ 558   4   * counter is reset to zero. We also invalidate the wr_write_req register on the last beat*/
+ 559   4   rule rl_dmem_burst_write_data(rg_burst_count != 0);
+ 560   4 `else	
+ 561   4   /*doc:rule: This rule sends the burst beats of the line write operation. On each iteration the
+ 562   4   * line is read from the eviction fifo of the data memory subystem and shifted by an appropriate
+ 563   4   * amount indicating the beat number. After the last beat, the rule's firing condition is false,
+ 564   4   * so next write starts only after rg_burst_count becomes zero, which is in write response rule*/
+ 565   4   rule rl_dmem_burst_write_data(rg_burst_count != 0 && rg_burst_count < fromInteger((`dblocks * `dwords * 8) / `buswidth));
+ 566   4     // last beat is detected if the burst_counter has reached the size of the words in each line -1.
+ 567   3 `endif
+ 568   3 
+ 569   4 `ifdef DUAL_ISSUE
+ 570   4 Bool last = rg_burst_count == fromInteger(`dblocks - 1 );
+ 571   4 `else
+ 572   4     Bool last = rg_burst_count == fromInteger(((`dblocks * `dwords * 8) / `buswidth)  - 1 );
+ 573   3 `endif
+ 574   3 
+ 575   3     // read the eviction fifo
+ 576   3     let req = dmem.send_mem_wr_req;
+ 577   3 
+ 578   3     // shift line by the relevant the amount
+ 579   3     req.data = req.data >> rg_shift_amount;
+ 580   3 	  let w  = AXI4_Wr_Data {wdata : truncate(req.data), wstrb : '1, wlast : last,
+ 581   3                            wid : 0};
+ 582   3     Bit#(TAdd#(TAdd#(TLog#(`dwords), 1), 3)) shift = {`dwords, 3'b0};
+ 583   3 
+ 584   3     // if last reset all state and exit this loop
+ 585   3     if(last) begin
+ 586   4 	`ifdef DUAL_ISSUE
+ 587   4 	rg_burst_count <= 0;
+ 588   4       rg_shift_amount <= (`dwords * 8);
+ 589   4       wr_write_req <= tagged Invalid;
+ 590   4       dmem.deq_mem_wr_req;
+ 591   4 	`else
+ 592   4       rg_shift_amount <= `buswidth;
+ 593   3 	`endif
+ 594   3     end
+ 595   3     else begin
+ 596   3       // generate the next shift amount and increment rg_burst_count counter.
+ 597   4 	`ifdef DUAL_ISSUE
+ 598   4 	rg_shift_amount <= rg_shift_amount + (`dwords * 8);
+ 599   4 	`else
+ 600   4       rg_shift_amount <= rg_shift_amount + `buswidth;
+ 601   3 	`endif
+ 602   3       rg_burst_count <= rg_burst_count + 1;
+ 603   3     end
+ 604   3 	  memory_xactor.i_wr_data.enq(w);
+ 605   3     `logLevel( core, 1, $format("[%2d]CORE : DMEM Write Data: %h rg_burst_count: %d last: %b \
+ 606   3 _shift_amount:%d",hartid, req.data, rg_burst_count, last, rg_shift_amount))
+ 607   3   endrule:rl_dmem_burst_write_data
+ 608   3 
+ 609   4 `ifdef DUAL_ISSUE
+ 610   4 /*doc:rule: This rule will simply forward the response obtained from the fabric for a previous
+ 611   4    * line write operation to the data memory subsystem*/
+ 612   4 `else
+ 613   4   /*doc:rule: This rule will forward the response obtained from the fabric for a previous
+ 614   4    * line write operation to the data memory subsystem, make rg_burst_count to zero and 
+ 615   4    * deques the evivtion fifo from cache. rg_write_req is also invalidated */
+ 616   3 `endif
+ 617   3   rule handle_dmem_line_write_resp (memory_xactor.o_wr_resp.first.bid == 0);
+ 618   3     let response <- pop_o(memory_xactor.o_wr_resp);
+ 619   3   	let bus_error = !(response.bresp == AXI4_OKAY);
+ 620   4 `ifdef DUAL_ISSUE
+ 621   4 	dmem.receive_mem_wr_resp.put(bus_error);
+ 622   4 `else
+ 623   4 	  // stall if error
+ 624   4     // if no error, write is complete, next write can start
+ 625   4     // hence, make rg_burst_count = 0, ensures all writes are sequenced
+ 626   4     if (!bus_error) begin
+ 627   4       rg_burst_count <= 0;
+ 628   4       rg_write_req <= tagged Invalid;
+ 629   4       dmem.receive_mem_wr_resp.put(bus_error);
+ 630   4       dmem.deq_mem_wr_req;
+ 631   4     end
+ 632   3 `endif
+ 633   3     `logLevel( core, 1, $format("[%2d]CORE : DMEM Write Line Response ",hartid, fshow(response)))
+ 634   3   endrule: handle_dmem_line_write_resp
+ 635   3 
+ 636   4 `ifdef itim 
+ 637   4   rule handle_dmem_itim_read_response;
+ 638   4   	let response <- imem.get_mem_read_itim_resp.get;
+ 639   4   	Bool bus_error = response.err;
+ 640   4     dmem.put_nc_read_resp.put(DCache_mem_readresp{data:zeroExtend(response.data),
+ 641   4                                               last:True,
+ 642   4                                               err :bus_error});
+ 643   4     `logLevel( core, 1, $format("[%2d]CORE : DMEM ITIM Response ",hartid, fshow(response)))
+ 644   4   endrule
+ 645   4   rule handle_itim_write_resp;
+ 646   4   	let response <- imem.get_mem_write_itim_resp.get;
+ 647   4   	Bool bus_error = response;
+ 648   4   	riscv.s5_cache.ma_io_response(tagged Valid tuple2(pack(bus_error),?));
+ 649   4     `logLevel( core, 1, $format("[%2d]CORE : ITIM Memory Write Response ",hartid, fshow(response)))
+ 650   4   endrule
+ 651   3 `endif
+ 652   2 `endif
+ 653   2 
+ 654   2   mkConnection(imem.ma_curr_priv, curr_priv);
+ 655   2   mkConnection(dmem.ma_curr_priv, curr_priv);
+ 656   2 
+ 657   3 `ifdef supervisor
+ 658   3   // if supervisor is implemented connect the various csrs required by the ptwalk and dtlb modules
+ 659   3   // here
+ 660   3   mkConnection(imem.ma_satp_from_csr,riscv.csrs.mv_csr_satp);
+ 661   3   mkConnection(dmem.ma_satp_from_csr, riscv.csrs.mv_csr_satp);
+ 662   3   mkConnection(dmem.ma_mstatus_from_csr, riscv.csrs.mv_csr_mstatus);
+ 663   3   mkConnection(ptwalk.ma_satp_from_csr,riscv.csrs.mv_csr_satp);
+ 664   3   mkConnection(ptwalk.ma_mstatus_from_csr, riscv.csrs.mv_csr_mstatus);
+ 665   4   `ifndef hypervisor
+ 666   4   mkConnection(ptwalk.ma_curr_priv,curr_priv);
+ 667   3   `endif
+ 668   4   `ifdef hypervisor
+ 669   4     mkConnection(ptwalk.ma_hgatp_from_csr,riscv.csrs.mv_csr_hgatp);
+ 670   4     mkConnection(ptwalk.ma_vsatp_from_csr,riscv.csrs.mv_csr_vsatp);
+ 671   4     mkConnection(ptwalk.ma_hstatus_from_csr, riscv.csrs.mv_csr_hstatus);
+ 672   4     mkConnection(ptwalk.ma_vsstatus_from_csr, riscv.csrs.mv_csr_vsstatus);
+ 673   4     mkConnection(dmem.ma_vsatp_from_csr,riscv.csrs.mv_csr_vsatp);
+ 674   4     mkConnection(dmem.ma_vsstatus_from_csr, riscv.csrs.mv_csr_vsstatus);
+ 675   4     mkConnection(imem.ma_vsatp_from_csr,riscv.csrs.mv_csr_vsatp);
+ 676   4     mkConnection(imem.ma_vs_mode, riscv.csrs.mv_vs_bit);				//vs_bit from from csr_grp1		
+ 677   3   `endif
+ 678   3   /*doc:rule: this rule forwards the tlb miss request from the itlb to the pagetable walk module.
+ 679   3   * This only fires if the page-table walk module is not already handling a miss*/
+ 680   3   rule rl_itlb_req_to_ptwalk(rg_ptw_state == None);
+ 681   3     let req <- imem.get_request_to_ptw.get();
+ 682   3     ptwalk.from_tlb.put(req);
+ 683   3     rg_ptw_state <= IWalk;
+ 684   3   endrule:rl_itlb_req_to_ptwalk
+ 685   3 
+ 686   3   /*doc:rule: This rule passes the response from the ptwalk-module to the itlb*/
+ 687   3   rule rl_ptwalk_resp_to_itlb(rg_ptw_state == IWalk);
+ 688   3     let resp <- ptwalk.to_tlb.get();
+ 689   3     imem.put_response_frm_ptw.put(resp);
+ 690   3     rg_ptw_state <= None;
+ 691   3   endrule:rl_ptwalk_resp_to_itlb
+ 692   3 
+ 693   3   /*doc:rule: This rule is used to connect the request from the data tlb to the ptwalk-module. Fires
+ 694   3    * only when the ptwalk is not already processing another tlb miss*/
+ 695   3   rule rl_dtlb_req_to_ptwalk(rg_ptw_state == None);
+ 696   3     let req <- dmem.get_req_to_ptw.get();
+ 697   3     ptwalk.from_tlb.put(req);
+ 698   3     rg_ptw_state <= DWalk;
+ 699   3   endrule:rl_dtlb_req_to_ptwalk
+ 700   3 
+ 701   3   /*doc:rule: This rule connects the ptwalk-module response to the data tlb*/
+ 702   3   rule rl_ptwalk_resp_to_dtlb(rg_ptw_state == DWalk);
+ 703   3     let resp <- ptwalk.to_tlb.get();
+ 704   3     dmem.put_resp_from_ptw.put(resp);
+ 705   3     rg_ptw_state <= None;
+ 706   3   endrule:rl_ptwalk_resp_to_dtlb
+ 707   3 
+ 708   3   /*doc:connect: this connects the ptwalk request to the data memory subsystem*/
+ 709   3   let ptwalk_req <- mkConnection(dmem.receive_core_req, ptwalk.request_to_cache);
+ 710   3 
+ 711   3   /*doc:connect: This connects the data memory response to the ptwalk-module*/
+ 712   3   mkConnection(dmem.get_ptw_resp, ptwalk.response_frm_cache);
+ 713   3 
+ 714   3   /*doc:connect: when a tlb-miss occurs in the data tlb, we need to park the original request in the
+ 715   3    * ptwalk-module so that it can be replayed again at the end of the walk.*/
+ 716   3   mkConnection(dmem.get_hold_req, ptwalk.hold_req);
+ 717   2 `endif
+ 718   2 
+ 719   3 `ifdef perfmonitors
+ 720   4   `ifdef icache
+ 721   4     mkConnection(riscv.perfmonitors.ma_icache_counters,imem.mv_icache_perf_counters);
+ 722   3   `endif
+ 723   4   `ifdef dcache
+ 724   4     mkConnection(riscv.perfmonitors.ma_dcache_counters,dmem.mv_dcache_perf_counters);
+ 725   3   `endif
+ 726   4   `ifdef supervisor
+ 727   4     mkConnection(riscv.perfmonitors.ma_itlb_counters,imem.mv_itlb_perf_counters);
+ 728   4     mkConnection(riscv.perfmonitors.ma_dtlb_counters,dmem.mv_dtlb_perf_counters);
+ 729   3   `endif
+ 730   2 `endif   
+ 731   2   
+ 732   2   interface sb_clint_msip = interface Put
+ 733   2     method Action put(Bit#(1) intrpt);
+ 734   2       riscv.interrupts.ma_clint_msip(intrpt);
+ 735   2     endmethod
+ 736   2   endinterface;
+ 737   2   interface sb_clint_mtip = interface Put
+ 738   2     method Action put(Bit#(1) intrpt);
+ 739   2       riscv.interrupts.ma_clint_mtip(intrpt);
+ 740   2     endmethod
+ 741   2   endinterface;
+ 742   2   interface sb_clint_mtime = interface Put
+ 743   2     method Action put (Bit#(64) c_mtime);
+ 744   2       riscv.interrupts.ma_clint_mtime(c_mtime);
+ 745   2     endmethod
+ 746   2   endinterface;
+ 747   2 
+ 748   2 	method sb_plic_meip  = riscv.interrupts.ma_plic_meip;
+ 749   3 `ifdef supervisor
+ 750   3 	method sb_plic_seip = riscv.interrupts.ma_plic_seip;
+ 751   2 `endif
+ 752   3 `ifdef usertraps
+ 753   3 	method sb_plic_ueip = riscv.interrupts.ma_plic_ueip;
+ 754   2 `endif
+ 755   2 	interface master_i = fetch_xactor.axi_side;
+ 756   2 	interface master_d = memory_xactor.axi_side;
+ 757   2   
+ 758   3    `ifdef etrace_support          
+ 759   3          interface etrace_ingress_port =  riscv.etrace_ingress_port;
+ 760   2       `endif
+ 761   2 	
+ 762   3 `ifdef rtldump
+ 763   3   interface commitlog = riscv.commitlog;
+ 764   3   interface sbread = riscv.sbread;
+ 765   2 `endif
+ 766   3 `ifdef debug
+ 767   3   method ma_debug_interrupt= riscv.ma_debug_interrupt;
+ 768   3   method mv_core_is_reset = riscv.mv_core_is_reset;
+ 769   3   method mv_core_debugenable = riscv.mv_core_debugenable;
+ 770   3   method ma_debugger_available = riscv.ma_debugger_available;
+ 771   3   method mv_stop_timer = riscv.mv_stop_timer;
+ 772   3   method mv_stop_count = riscv.mv_stop_count;
+ 773   2 `endif
+ 774   2 endmodule : mkccore_axi4
+ 775   2 
+ 776   2 endpackage:ccore

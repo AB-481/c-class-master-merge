@@ -1,0 +1,392 @@
+14 1 `ifdef async_rst
+18 0 `endif  
+31 1 `ifdef ovl_assert
+33 0 `endif
+34 1 `ifdef sva_assert
+36 0 `endif
+43 1   `ifdef dcache_ecc
+46 0   `endif
+51 1     `ifdef dcache_ecc
+54 0     `endif
+59 1   `ifdef dcache_ecc
+66 0   `endif
+71 1   `ifdef dcache_ecc
+78 0   `endif
+115 1 `ifdef DUAL_ISSUE
+119 0 `endif
+120 1   `ifdef dcache_ecc
+122 0   `endif
+125 1   module mk_tagram1rw#(parameter Bit#(32) id `ifdef testmode ,Bool test_mode `endif )(Ifc_tagram1rw#(wordsize, blocksize, sets, ways, paddr))
+125 0   module mk_tagram1rw#(parameter Bit#(32) id `ifdef testmode ,Bool test_mode `endif )(Ifc_tagram1rw#(wordsize, blocksize, sets, ways, paddr))
+133 1         `ifdef dcache_ecc
+142 0         `endif
+149 1 `ifdef DUAL_ISSUE
+150 2   `ifdef tagreg
+154 3     `ifdef dcache_ecc
+160 2     `endif
+161 1   `endif
+169 2           `ifdef tagreg
+173 1           `endif
+176 2         `ifdef tagreg
+180 1         `endif
+186 2     `ifdef tagreg
+195 1     `endif
+202 2     `ifdef tagreg//{
+208 3     `ifdef dcache_ecc
+213 2     `endif
+217 3       `ifdef dcache_ecc
+222 2       `endif
+224 3     `ifdef dcache_ecc
+229 2     `endif
+233 3       return TagResponse{`ifdef dcache_ecc sed: sed, ded: ded, `endif waymask: lv_hitvector};
+233 2       return TagResponse{`ifdef dcache_ecc sed: sed, ded: ded, `endif waymask: lv_hitvector};
+234 1     `endif //}
+238 2   `ifdef dcache_ecc
+240 3                                                         replicateM(mkmem_config1rw_ecc(False `ifdef testmode ,test_mode `endif ));
+240 2                                                         replicateM(mkmem_config1rw_ecc(False `ifdef testmode ,test_mode `endif ));
+243 3                                                         replicateM(mkmem_config1rw(False `ifdef testmode ,test_mode `endif ));
+243 2                                                         replicateM(mkmem_config1rw(False `ifdef testmode ,test_mode `endif ));
+244 1   `endif
+262 2     `ifdef dcache_ecc
+267 1     `endif
+270 2       `ifdef dcache_ecc
+275 1       `endif
+277 2       `ifdef dcache_ecc
+282 1     `endif
+284 2       return  TagSelectResponse{`ifdef dcache_ecc sed: sed, ded: ded, `endif tag:lv_tag}  ;
+284 1       return  TagSelectResponse{`ifdef dcache_ecc sed: sed, ded: ded, `endif tag:lv_tag}  ;
+291 2     `ifdef dcache_ecc
+296 1     `endif
+300 2       `ifdef dcache_ecc
+305 1       `endif
+307 2     `ifdef dcache_ecc
+312 1     `endif
+316 2       return TagResponse{`ifdef dcache_ecc sed: sed, ded: ded, `endif waymask: lv_hitvector};
+316 1       return TagResponse{`ifdef dcache_ecc sed: sed, ded: ded, `endif waymask: lv_hitvector};
+318 0 `endif
+320 1   `ifdef dcache_ecc
+324 0   `endif
+397 1 `ifndef DUAL_ISSUE
+398 2  `ifdef dcache_ecc 
+400 1 `endif 
+401 0 `endif
+497 1 `ifdef DUAL_ISSUE
+498 2       Bit#(1) lv_word_ded = `ifdef dcache_ecc lv_line_ded[blocknum] `else 0 `endif ;
+498 1       Bit#(1) lv_word_ded = `ifdef dcache_ecc lv_line_ded[blocknum] `else 0 `endif ;
+499 2       Bit#(1) lv_word_sed = `ifdef dcache_ecc lv_line_sed[blocknum] `else 0 `endif ;
+499 1       Bit#(1) lv_word_sed = `ifdef dcache_ecc lv_line_sed[blocknum] `else 0 `endif ;
+501 2       return DataWordResponse{`ifdef dcache_ecc 
+505 1                           `endif 
+515 0 `endif
+531 1 `ifdef DUAL_ISSUE
+532 2       Bit#(1) lv_word_ded = `ifdef dcache_ecc lv_line_ded[blocknum] `else 0 `endif ;
+532 1       Bit#(1) lv_word_ded = `ifdef dcache_ecc lv_line_ded[blocknum] `else 0 `endif ;
+533 2       Bit#(1) lv_word_sed = `ifdef dcache_ecc lv_line_sed[blocknum] `else 0 `endif ;
+533 1       Bit#(1) lv_word_sed = `ifdef dcache_ecc lv_line_sed[blocknum] `else 0 `endif ;
+535 2       return DataLineResponse{`ifdef dcache_ecc 
+539 1                           `endif line: lv_selected_line};
+542 0 `endif
+568 1   `ifdef dcache_ecc
+570 0   `endif
+581 1         `ifdef dcache_ecc
+591 0         `endif
+597 1   `ifdef dcache_ecc
+604 0   `endif
+630 1     `ifdef dcache_ecc
+635 0     `endif
+639 1       `ifdef dcache_ecc
+644 0       `endif
+646 1     `ifdef dcache_ecc
+651 0     `endif
+655 1       return TagResponse{`ifdef dcache_ecc sed: sed, ded: ded, `endif 
+655 0       return TagResponse{`ifdef dcache_ecc sed: sed, ded: ded, `endif 
+664 1   `ifdef dcache_ecc
+668 0   `endif
+671 1     `ifdef dcache_ecc
+680 0     `endif
+707 1   `ifdef dcache_ecc
+709 0   `endif
+712 1 `ifdef DUAL_ISSUE
+734 2         `ifdef dcache_ecc
+740 1         `endif
+746 2   `ifdef dcache_ecc
+752 1   `endif
+753 2   `ifdef dcache_zbus
+760 1   `endif
+776 2     `ifdef ASSERT
+778 1     `endif
+781 2     `ifdef dcache_ecc
+786 1     `endif
+789 2       `ifdef dcache_ecc
+794 1       `endif
+797 2         `ifdef dcache_ecc
+802 1         `endif
+805 2       `ifdef dcache_ecc
+810 1       `endif
+818 2       `ifdef dcache_zbus
+828 3           `ifdef dcache_ecc
+833 2           `endif
+836 1       `endif
+838 2       Bit#(1) lv_word_ded = 0 ;//`ifdef dcache_ecc lv_line_ded[blocknum] `else 0 `endif ;
+838 1       Bit#(1) lv_word_ded = 0 ;//`ifdef dcache_ecc lv_line_ded[blocknum] `else 0 `endif ;
+839 2       Bit#(1) lv_word_sed = 0 ;//`ifdef dcache_ecc lv_line_sed[blocknum] `else 0 `endif ;
+839 1       Bit#(1) lv_word_sed = 0 ;//`ifdef dcache_ecc lv_line_sed[blocknum] `else 0 `endif ;
+841 2       return DataLineResponse{`ifdef dcache_ecc 
+845 1                           `endif line: lv_selected_line};
+852 2     `ifdef ASSERT
+854 1     `endif
+859 2     `ifdef dcache_ecc
+864 1     `endif
+868 2       `ifdef dcache_ecc
+873 1       `endif
+877 2         `ifdef dcache_ecc
+882 1         `endif
+886 2       `ifdef dcache_ecc
+891 1       `endif
+898 2           `ifdef dcache_ecc
+903 1           `endif
+907 2       Bit#(1) lv_word_ded = `ifdef dcache_ecc lv_line_ded[blocknum] `else 0 `endif ;
+907 1       Bit#(1) lv_word_ded = `ifdef dcache_ecc lv_line_ded[blocknum] `else 0 `endif ;
+908 2       Bit#(1) lv_word_sed = `ifdef dcache_ecc lv_line_sed[blocknum] `else 0 `endif ;
+908 1       Bit#(1) lv_word_sed = `ifdef dcache_ecc lv_line_sed[blocknum] `else 0 `endif ;
+910 2       return DataWordResponse{`ifdef dcache_ecc 
+914 1                           `endif word: lv_selected_word, line: lv_selected_line};
+917 2   `ifdef dcache_ecc
+924 1   `endif
+928 2   module mk_dataram1rw#(parameter Bit#(32) id, parameter Bool onehot `ifdef testmode ,Bool test_mode `endif )
+928 1   module mk_dataram1rw#(parameter Bit#(32) id, parameter Bool onehot `ifdef testmode ,Bool test_mode `endif )
+946 2         `ifdef dcache_ecc
+954 1         `endif
+960 2   `ifdef dcache_ecc
+962 3                                                       <- replicateM(mkmem_config1rw_ecc(False `ifdef testmode ,test_mode `endif ));
+962 2                                                       <- replicateM(mkmem_config1rw_ecc(False `ifdef testmode ,test_mode `endif ));
+965 3                                                       <- replicateM(mkmem_config1rw(False `ifdef testmode ,test_mode `endif ));
+965 2                                                       <- replicateM(mkmem_config1rw(False `ifdef testmode ,test_mode `endif ));
+966 1   `endif
+967 2   `ifdef dcache_zbus
+974 1   `endif
+990 2     `ifdef ASSERT
+992 1     `endif
+995 2     `ifdef dcache_ecc
+1000 1     `endif
+1003 2       `ifdef dcache_ecc
+1008 1       `endif
+1011 2         `ifdef dcache_ecc
+1016 1         `endif
+1019 2       `ifdef dcache_ecc
+1024 1       `endif
+1032 2       `ifdef dcache_zbus
+1042 3           `ifdef dcache_ecc
+1047 2           `endif
+1050 1       `endif
+1052 2       Bit#(1) lv_word_ded = 0 ;//`ifdef dcache_ecc lv_line_ded[blocknum] `else 0 `endif ;
+1052 1       Bit#(1) lv_word_ded = 0 ;//`ifdef dcache_ecc lv_line_ded[blocknum] `else 0 `endif ;
+1053 2       Bit#(1) lv_word_sed = 0 ;//`ifdef dcache_ecc lv_line_sed[blocknum] `else 0 `endif ;
+1053 1       Bit#(1) lv_word_sed = 0 ;//`ifdef dcache_ecc lv_line_sed[blocknum] `else 0 `endif ;
+1055 2       return DataLineResponse{`ifdef dcache_ecc 
+1059 1                           `endif line: lv_selected_line};
+1066 2     `ifdef ASSERT
+1068 1     `endif
+1073 2     `ifdef dcache_ecc
+1078 1     `endif
+1082 2       `ifdef dcache_ecc
+1087 1       `endif
+1091 2         `ifdef dcache_ecc
+1096 1         `endif
+1100 2       `ifdef dcache_ecc
+1105 1       `endif
+1112 2           `ifdef dcache_ecc
+1117 1           `endif
+1121 2       Bit#(1) lv_word_ded = `ifdef dcache_ecc lv_line_ded[blocknum] `else 0 `endif ;
+1121 1       Bit#(1) lv_word_ded = `ifdef dcache_ecc lv_line_ded[blocknum] `else 0 `endif ;
+1122 2       Bit#(1) lv_word_sed = `ifdef dcache_ecc lv_line_sed[blocknum] `else 0 `endif ;
+1122 1       Bit#(1) lv_word_sed = `ifdef dcache_ecc lv_line_sed[blocknum] `else 0 `endif ;
+1124 2       return DataWordResponse{`ifdef dcache_ecc 
+1128 1                           `endif word: lv_selected_word, line: lv_selected_line};
+1131 2   `ifdef dcache_ecc
+1138 1   `endif
+1140 0 `endif
+1165 1   `ifdef dcache_ecc
+1167 0   `endif
+1184 1         `ifdef dcache_ecc
+1191 0         `endif
+1197 1   `ifdef dcache_ecc
+1203 0   `endif
+1232 1     `ifdef dcache_ecc
+1237 0     `endif
+1241 1       `ifdef dcache_ecc
+1246 0       `endif
+1250 1         `ifdef dcache_ecc
+1255 0         `endif
+1259 1       `ifdef dcache_ecc
+1264 0       `endif
+1271 1           `ifdef dcache_ecc
+1276 0           `endif
+1281 1       Bit#(1) lv_word_ded = `ifdef dcache_ecc lv_line_ded[blocknum] `else 0 `endif ;
+1281 0       Bit#(1) lv_word_ded = `ifdef dcache_ecc lv_line_ded[blocknum] `else 0 `endif ;
+1282 1       Bit#(1) lv_word_sed = `ifdef dcache_ecc lv_line_sed[blocknum] `else 0 `endif ;
+1282 0       Bit#(1) lv_word_sed = `ifdef dcache_ecc lv_line_sed[blocknum] `else 0 `endif ;
+1284 1       return DataWordResponse{`ifdef dcache_ecc 
+1288 0                           `endif line: lv_selected_line, word: lv_selected_word};
+1295 1     `ifdef dcache_ecc
+1300 0     `endif
+1303 1       `ifdef dcache_ecc
+1308 0       `endif
+1311 1         `ifdef dcache_ecc
+1316 0         `endif
+1319 1       `ifdef dcache_ecc
+1324 0       `endif
+1330 1           `ifdef dcache_ecc
+1335 0           `endif
+1340 1 `ifdef DUAL_ISSUE
+1341 2       Bit#(1) lv_word_ded = `ifdef dcache_ecc lv_line_ded[blocknum] `else 0 `endif ;
+1341 1       Bit#(1) lv_word_ded = `ifdef dcache_ecc lv_line_ded[blocknum] `else 0 `endif ;
+1342 2       Bit#(1) lv_word_sed = `ifdef dcache_ecc lv_line_sed[blocknum] `else 0 `endif ;
+1342 1       Bit#(1) lv_word_sed = `ifdef dcache_ecc lv_line_sed[blocknum] `else 0 `endif ;
+1346 0 `endif
+1348 1       return DataLineResponse{`ifdef dcache_ecc 
+1352 0                           `endif line: lv_selected_line};
+1357 1     `ifdef dcache_ecc
+1362 0     `endif
+1365 1       `ifdef dcache_ecc
+1370 0       `endif
+1373 1         `ifdef dcache_ecc
+1378 0         `endif
+1381 1       `ifdef dcache_ecc
+1386 0       `endif
+1392 1           `ifdef dcache_ecc
+1397 0           `endif
+1401 1       return DataLineResponse{`ifdef dcache_ecc 
+1405 0                           `endif line: lv_selected_line};
+1407 1   `ifdef dcache_ecc
+1414 0   `endif
+1423 1 `ifndef DUAL_ISSUE
+1425 0 `endif
+1440 1 `ifdef DUAL_ISSUE
+1444 0 `endif
+1456 1   `ifdef dcache_ecc
+1460 0   `endif
+1465 1 `ifdef DUAL_ISSUE 
+1467 0 `endif
+1470 1 `ifdef dcache_ecc
+1474 0 `endif
+1477 1 `ifdef DUAL_ISSUE
+1479 0 `endif
+1500 1 `ifndef DUAL_ISSUE
+1503 0 `endif
+1505 1         `ifdef dcache_ecc
+1507 0         `endif
+1520 1   `ifdef dcache_ecc
+1522 0   `endif
+1575 1     `ifdef dcache_ecc
+1581 0     `endif
+1652 1   `ifdef ovl_assert
+1669 0   `endif
+1688 1         `ifdef dcache_ecc
+1691 0         `endif
+1701 1                         `ifdef dcache_ecc
+1704 0                         `endif
+1805 1 `ifdef DUAL_ISSUE
+1846 0 `endif
+1857 1 `ifdef DUAL_ISSUE
+1974 0 `endif
+2015 1   `ifdef dcache_ecc
+2026 2 `ifdef DUAL_ISSUE
+2031 1 `endif
+2034 0   `endif
+2042 1   `ifndef atomic
+2047 0   `endif
+2048 1   `ifdef supervisor
+2051 0   `endif
+2067 1 `ifdef DUAL_ISSUE
+2070 0 `endif
+2121 1   `ifdef sva_assert
+2134 0   `endif
+2141 1     `ifdef ASSERT
+2143 0     `endif
+2145 1 `ifdef DUAL_ISSUE
+2151 0 `endif
+2156 1     `ifdef supervisor
+2160 0     `endif
+2167 1 `ifdef DUAL_ISSUE
+2173 0 `endif
+2180 1 `ifdef DUAL_ISSUE
+2184 0 `endif
+2230 1           `ifdef atomic ,Bool atomic, Bit#(TMul#(8,wordsize)) read_data, Bit#(5) atomic_op `endif );
+2230 0           `ifdef atomic ,Bool atomic, Bit#(TMul#(8,wordsize)) read_data, Bit#(5) atomic_op `endif );
+2254 1             `ifdef atomic
+2256 0             `endif
+2262 1   `ifdef atomic
+2267 2     `ifdef RV64
+2272 1     `endif
+2289 0   `endif
+2331 1   `ifdef sva_assert
+2344 0   `endif
+2355 1   `ifdef atomic
+2367 2     `ifdef RV64
+2371 1     `endif
+2378 0   `endif
+2425 1           `ifdef atomic ,Bool atomic, Bit#(TMul#(8,wordsize)) read_data, 
+2426 2           Bit#(5) atomic_op `endif ) if(!sb_full `ifdef atomic && !rg_sb_busy `endif );
+2426 1           Bit#(5) atomic_op `endif ) if(!sb_full `ifdef atomic && !rg_sb_busy `endif );
+2441 2     `ifdef ASSERT
+2443 1     `endif
+2444 2 `ifdef DUAL_ISSUE
+2451 1 `endif
+2462 2     `ifdef atomic 
+2467 1     `endif
+2473 2     `ifdef ASSERT
+2476 1     `endif
+2481 2 `ifdef DUAL_ISSUE
+2488 1 `endif
+2499 2 `ifdef DUAL_ISSUE
+2503 1 `endif
+2576 2   `ifdef atomic
+2579 1   `endif
+2615 2   `ifdef atomic
+2620 3     `ifdef RV64
+2625 2     `endif
+2643 1   `endif
+2686 2   `ifdef atomic
+2699 3     `ifdef RV64
+2703 2     `endif
+2711 1   `endif
+2716 2     `ifdef ASSERT
+2718 1     `endif
+2744 2     `ifdef ASSERT
+2747 1     `endif
+2773 2     `ifdef ASSERT
+2776 1     `endif
+2792 2   `ifdef atomic 
+2803 1   `endif
+2822 2     `ifdef ASSERT
+2824 1     `endif
+2868 2     `ifdef ASSERT
+2870 1     `endif
+2880 2     `ifdef ASSERT
+2883 1     `endif
+2900 2 `ifdef dcache_2rw
+2915 3 `ifndef DUAL_ISSUE
+2917 2 `endif
+2949 3 `ifdef core_clkgate
+2953 2 `endif
+2954 3   module mkdcache_tag#(parameter Bit#(32) id `ifdef testmode ,Bool test_mode `endif )(Ifc_tagram1rw#(`dwords, `dblocks, `dsets, `dways, `paddr));
+2954 2   module mkdcache_tag#(parameter Bit#(32) id `ifdef testmode ,Bool test_mode `endif )(Ifc_tagram1rw#(`dwords, `dblocks, `dsets, `dways, `paddr));
+2956 3     mk_tagram1rw _temp(id `ifdef testmode ,test_mode `endif ,ifc);
+2956 2     mk_tagram1rw _temp(id `ifdef testmode ,test_mode `endif ,ifc);
+2959 3 `ifdef core_clkgate
+2963 2 `endif
+2964 3   module mkdcache_data#(parameter Bit#(32) id `ifdef testmode ,Bool test_mode `endif )(Ifc_dataram1rw#(`dwords, `dblocks, `dsets, `dways));
+2964 2   module mkdcache_data#(parameter Bit#(32) id `ifdef testmode ,Bool test_mode `endif )(Ifc_dataram1rw#(`dwords, `dblocks, `dsets, `dways));
+2966 3     mk_dataram1rw#(id,unpack(`dcache_onehot) `ifdef testmode ,test_mode `endif ) _temp(ifc);
+2966 2     mk_dataram1rw#(id,unpack(`dcache_onehot) `ifdef testmode ,test_mode `endif ) _temp(ifc);
+2969 3 `ifdef core_clkgate
+2973 2 `endif
+2975 3 `ifdef DUAL_ISSUE
+2977 2 `endif));
+2982 3   `ifdef core_clkgate
+2986 2   `endif
+2992 1 `endif
+2993 2   `ifdef core_clkgate
+2997 1   `endif
+FINAL = 1

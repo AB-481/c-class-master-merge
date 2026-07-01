@@ -1,0 +1,30 @@
+caches_mmu:
+  url: https://gitlab.com/shaktiproject/uncore/caches_mmu
+  checkout: 14.4.3
+common_bsv:
+  url: https://gitlab.com/shaktiproject/common_bsv
+  checkout: 3.1.0
+devices:
+  url: https://gitlab.com/shaktiproject/uncore/devices
+  checkout: 9.0.1
+fabrics:
+  url: https://gitlab.com/shaktiproject/uncore/fabrics
+  checkout: 1.3.6
+common_verilog:
+  url: https://gitlab.com/shaktiproject/common_verilog
+  checkout: 3.2.0
+verification:
+  url: https://gitlab.com/shaktiproject/verification_environment/verification
+  checkout: 5.0.10
+  recursive: True
+  patch:
+    - [riscv-tests/env , verification/patches/cclass-env.patch]
+benchmarks:
+  url: https://gitlab.com/shaktiproject/cores/benchmarks
+  checkout: 1.0.0
+csrbox:
+  url: https://gitlab.com/shaktiproject/cores/csrbox
+  checkout: 1.12.0
+riscv-config:
+  url: https://gitlab.com/shaktiproject/cores/riscv-config
+  checkout: 3.8.0

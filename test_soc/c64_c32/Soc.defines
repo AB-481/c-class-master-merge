@@ -1,0 +1,46 @@
+`ifdef debug
+`ifdef etrace_support 
+`define Num_Slaves 9
+`else
+`define Num_Slaves 7
+`endif
+`else
+`ifdef etrace_support 
+`define Num_Slaves 8
+`else
+`define Num_Slaves 6
+`endif
+`endif
+`define Memory_slave_num 0
+`define BootRom_slave_num 1
+`define Uart_slave_num 2
+`define Clint_slave_num 3
+`define Sign_slave_num 4
+`define Err_slave_num 5
+`define Debug_slave_num 6
+`ifdef etrace_support 
+`define Trace_slave_num 7
+`define Memtrace_slave_num 8
+`endif
+// master numbers on fabric
+// slave numbers of fabric
+
+
+`define MemoryBase  'h8000_0000
+`define MemoryEnd   'h8FFF_FFFF
+`define BootRomBase 'h0000_1000
+`define BootRomEnd  'h0001_0FFF
+`define UartBase    'h11300
+`define UartEnd     'h11340
+`define ClintBase   'h0200_0000
+`define ClintEnd    'h020B_FFFF
+`define SignBase    'h0005_0000
+`define SignEnd     'h0005_000c
+`define DebugBase   'h0000_0000
+`define DebugEnd    'h0000_0FFF
+`ifdef etrace_support 
+`define TraceBase     'h0006_0000
+`define TraceEnd      'h0006_0FFF
+`define MemtraceBase  'h7000_0000
+`define MemtraceEnd   'h7FFF_FFFF
+`endif

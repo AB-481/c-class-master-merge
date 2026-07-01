@@ -1,0 +1,69 @@
+--- /home/ananya/c-class-master/src/stage2.bsv	2026-06-04 09:50:58.612499901 +0530
++++ /home/ananya/c-class-dual-issue/src/stage2.bsv	2026-05-22 16:59:46.537093037 +0530
+@@ -164,12 +164,8 @@
+ //typedef enum {CheckPrev, None} ActionType deriving(Bits, Eq);
+ 
+ `ifdef stage2_noinline
+-`ifdef core_clkgate
+-(*synthesize,gate_all_clocks*)
+-`else
+ (*synthesize*)
+ `endif
+-`endif
+ module mkstage2#(parameter Bit#(`xlen) hartid) (Ifc_stage2);
+ 
+   String stage2=""; // defined for logger
+@@ -192,14 +188,7 @@
+   TX#(Vector#(`num_issue, Instruction_type))   tx_instrtype <- mkTX;
+ 
+   /*doc:mod FIFO interface to send the operands meta data to the next stage.*/
+-  
+   TX#(OpMeta)   tx_opmeta <- mkTX;
+-  
+-`ifdef etrace_support
+-  TX#(Bit#(8))   tx_ingress_opcode <- mkTX;
+-  RX#(Bit#(1))   rx_ingress_opcode <- mkRX;
+- `endif 
+-  
+ `ifdef rtldump
+   // fifo interface used to transmit the trace of the instruction for rtl.dump generation
+   TX#(Vector#(`num_issue, CommitLogPacket)) tx_commitlog <- mkTX;
+@@ -708,18 +697,6 @@
+                       (decoded_inst[1].op_type.rs2type == Immediate) ? signExtend(imm[1]) : rs5_from_rf;
+     Bit#(32) inst1_imm = signExtend(imm[1]);
+     // -------------------------------------------------------------------------------------- //
+-    let stage3meta = Stage3Meta{funct : func_cause, memaccess : decoded.meta.memaccess,
+-                                pc : pc, epochs : epochs, rd: decoded.op_addr.rd,
+-                                is_microtrap: rg_microtrap
+-                  `ifdef hypervisor ,hlvx : decoded.meta.hlvx
+-                                    ,hvm_loadstore : decoded.meta.hvm_loadstore
+-                  `endif
+-                  `ifdef spfpu ,rdtype      : decoded.op_type.rdtype `endif
+-                  `ifdef RV64  , word32     :     word32
+-                  `elsif dpfpu , word32     :     word32 `endif
+-                            `ifdef bpu                , btbresponse:  btbresponse
+-                                `ifdef compressed     , compressed : compressed `endif
+-                            `endif };
+ 
+     Vector#(`num_issue, Stage3Meta) stage3meta;
+     for (Integer i=0; i<`num_issue; i=i+1) begin
+@@ -935,9 +912,6 @@
+     interface tx_mtval_to_stage3  = tx_mtval.e;
+     interface tx_instrtype_to_stage3 = tx_instrtype.e;
+     interface tx_opmeta_to_stage3= tx_opmeta.e;
+-    `ifdef etrace_support
+-    interface tx_ingress_opcode= tx_ingress_opcode.e;
+-     `endif
+   `ifdef rtldump
+     interface tx_commitlog= tx_commitlog.e;
+   `endif
+@@ -948,9 +922,6 @@
+     interface rx_commitlog = rx_commitlog.e;
+   `endif
+ 	  interface rx_from_stage1 = rx_pipe1.e;
+-	  `ifdef etrace_support
+-	  interface rx_ingress_opcode =  rx_ingress_opcode.e;
+-	   `endif
+ 	endinterface;
+ 
+   interface common = interface Ifc_s2_common

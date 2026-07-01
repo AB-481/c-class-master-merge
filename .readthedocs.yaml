@@ -1,0 +1,16 @@
+version: 2
+sphinx:
+   configuration: docs/source/conf.py
+python:
+   install:
+     - requirements: docs/requirements.txt
+build:
+  os: "ubuntu-22.04"
+  tools:
+    python: "3.7"
+  jobs:
+    pre_install:
+      - pip install Sphinx==3.5.3
+      - cd c-class; git clone https://gitlab.com/shaktiproject/cores/soc_config.git; cd -
+
+
